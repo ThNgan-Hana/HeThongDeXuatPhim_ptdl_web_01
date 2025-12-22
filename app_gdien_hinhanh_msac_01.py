@@ -12,37 +12,119 @@ from collections import Counter
 # ==============================================================================
 # 1. CẤU HÌNH TRANG & CSS
 # ==============================================================================
+import streamlit as st
+import pandas as pd
+import numpy as np
+import ast
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.preprocessing import MinMaxScaler
+from collections import Counter
+
+# ==============================================================================
+# 1. CẤU HÌNH TRANG & CSS (GIAO DIỆN NÂNG CAO)
+# ==============================================================================
 st.set_page_config(
-    page_title="Movie RecSys AI",
+    page_title="DreamStream - Movie AI",
     page_icon="🎬",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS cho giao diện đẹp hơn
+# Custom CSS cho giao diện đẹp, hiện đại (Netflix Style)
 st.markdown("""
 <style>
+    /* Import Font hiện đại */
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap');
+
+    html, body, [class*="css"] {
+        font-family: 'Poppins', sans-serif;
+    }
+
+    /* 1. Tiêu đề Gradient */
+    h1 {
+        background: linear-gradient(to right, #ff4b4b, #ff9068);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-weight: 800 !important;
+        margin-bottom: 0px;
+    }
+
+    /* 2. Nút bấm (Button) - Hiệu ứng Glow */
     .stButton>button {
         width: 100%;
-        border-radius: 5px;
+        border-radius: 12px;
         height: 3em;
-        background-color: #ff4b4b;
+        background: linear-gradient(90deg, #ff4b4b 0%, #ff416c 100%);
         color: white;
+        border: none;
+        font-weight: 600;
+        box-shadow: 0 4px 15px rgba(255, 75, 75, 0.3);
+        transition: all 0.3s ease;
     }
-    .movie-card {
+    .stButton>button:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(255, 75, 75, 0.5);
+        background: linear-gradient(90deg, #ff416c 0%, #ff4b4b 100%);
+    }
+
+    /* 3. Poster Phim - Hiệu ứng Zoom & Shadow */
+    div[data-testid="stImage"] img {
+        border-radius: 12px;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+    div[data-testid="stImage"] img:hover {
+        transform: scale(1.05);
+        box-shadow: 0 12px 24px rgba(0,0,0,0.6);
+        z-index: 10;
+        cursor: pointer;
+    }
+
+    /* 4. Expander (Nút xem chi tiết) */
+    .streamlit-expanderHeader {
+        background-color: #1f1f1f; /* Màu nền tối hơn */
+        border-radius: 8px;
+        font-size: 0.9em;
+        color: #e0e0e0;
+    }
+    
+    /* 5. Sidebar */
+    section[data-testid="stSidebar"] {
+        background-color: #161616; /* Sidebar tối màu */
+    }
+    
+    /* 6. Tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 10px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        border-radius: 8px 8px 0 0;
         background-color: #262730;
-        padding: 10px;
-        border-radius: 10px;
-        margin-bottom: 10px;
-        text-align: center;
+        padding: 0 20px;
+        border: none;
     }
-    .movie-title {
-        font-weight: bold;
-        font-size: 1.1em;
-        margin-top: 5px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+    .stTabs [aria-selected="true"] {
+        background-color: #ff4b4b !important;
+        color: white !important;
+    }
+
+    /* Tùy chỉnh thanh cuộn cho gọn */
+    ::-webkit-scrollbar {
+        width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+        background: #0e1117; 
+    }
+    ::-webkit-scrollbar-thumb {
+        background: #555; 
+        border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: #888; 
     }
 </style>
 """, unsafe_allow_html=True)
@@ -542,6 +624,7 @@ elif st.session_state.user_mode in ['guest', 'register']:
                         st.write(f"🏷️ **Thể loại:** {row['Thể loại phim']}")
                         st.write(f"⭐ **Điểm:** {round(row['Độ phổ biến'], 1)}")
                         st.caption(f"📝 {row['Mô tả'][:100]}...")
+
 
 
 
