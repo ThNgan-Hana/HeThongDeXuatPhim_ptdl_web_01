@@ -383,32 +383,20 @@ elif st.session_state.user_mode == 'member':
 elif st.session_state.user_mode in ['guest', 'register']:
     
     selected_g = st.session_state.user_genres
-    
-    if menu == "Đề xuất AI (Cơ bản)":
-        # Với khách, AI sẽ dựa trên thể loại họ chọn + độ phổ biến
-        st.header("✨ Đề xuất Phim (Dựa trên lựa chọn của bạn)")
-        st.write(f"Các thể loại bạn quan tâm: {', '.join(selected_g)}")
-        
-        # Dùng hàm genre recommendation nhưng hiển thị dưới dạng 'AI' (phổ biến nhất trong thể loại đó)
-        recs = get_genre_recommendations(selected_g, top_k=10)
-        
-        cols = st.columns(5)
-        for i, (idx, row) in enumerate(recs.iterrows()):
-            with cols[i % 5]:
-                st.image(row['Link Poster'], use_container_width=True)
-                st.caption(row['Tên phim'])
+   
                 
-    elif menu == "Theo Thể loại Đã chọn":
+    if menu == "Theo Thể loại Đã chọn":
         st.header("📂 Duyệt phim theo Thể loại")
         # Cho phép lọc kỹ hơn trong các thể loại đã chọn
         sub_genre = st.selectbox("Chọn cụ thể:", selected_g)
-        if sub_genre:
+    else sub_genre:
             recs = get_genre_recommendations([sub_genre], top_k=10)
             cols = st.columns(5)
             for i, (idx, row) in enumerate(recs.iterrows()):
                 with cols[i % 5]:
                     st.image(row['Link Poster'], use_container_width=True)
                     st.caption(row['Tên phim'])
+
 
 
 
