@@ -3,334 +3,391 @@ import pandas as pd
 import numpy as np
 import ast
 import matplotlib.pyplot as plt
+import seaborn as sns
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import MinMaxScaler
-import re
+from collections import Counter
 
 # ==============================================================================
-# 0. CẤU HÌNH TRANG & CSS (MÀU SẮC TỰ ĐỘNG + BỐ CỤC ĐẸP)
+# 1. CẤU HÌNH TRANG & CSS
 # ==============================================================================
 st.set_page_config(
-    page_title="Cinematch",
-    page_icon="🍿",
+    page_title="Movie RecSys AI",
+    page_icon="🎬",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-def inject_custom_css():
-    st.markdown("""
-    <style>
-    /* Tối ưu khoảng cách lề */
-    .block-container {
-        padding-top: 1.5rem !important;
-        padding-bottom: 3rem !important;
+# Custom CSS cho giao diện đẹp hơn
+st.markdown("""
+<style>
+    .stButton>button {
+        width: 100%;
+        border-radius: 5px;
+        height: 3em;
+        background-color: #ff4b4b;
+        color: white;
     }
-
-    /* Card Phim: Tự động đổi màu theo giao diện Sáng/Tối */
-    .movie-card-container {
-        background-color: var(--secondary-background-color); 
-        border-radius: 12px;
-        padding: 8px;
-        border: 1px solid rgba(128, 128, 128, 0.2); 
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-        height: 100%;
-        color: var(--text-color);
+    .movie-card {
+        background-color: #262730;
+        padding: 10px;
+        border-radius: 10px;
+        margin-bottom: 10px;
+        text-align: center;
     }
-    
-    .movie-card-container:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        border-color: #E50914;
-    }
-
-    /* Ảnh Poster */
-    div[data-testid="stImage"] img {
-        height: 380px !important;
-        object-fit: cover;        
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    }
-    
-    /* Nút bấm đỏ Netflix */
-    .stButton > button {
-        background-color: #E50914 !important;
-        color: white !important;
-        border: none;
-        border-radius: 6px;
-        font-weight: 600;
-    }
-    .stButton > button:hover {
-        opacity: 0.8;
-    }
-
-    /* Typography */
-    h4 {
-        font-family: 'Source Sans Pro', sans-serif;
-        font-size: 1rem !important;
-        margin-top: 8px;
-        margin-bottom: 4px;
-        white-space: nowrap; 
+    .movie-title {
+        font-weight: bold;
+        font-size: 1.1em;
+        margin-top: 5px;
+        white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        font-weight: 700;
-        color: var(--text-color);
     }
-    
-    .small-text {
-        font-size: 0.85rem;
-        opacity: 0.7;
-        color: var(--text-color);
-    }
-
-    /* Input Fields trong suốt */
-    .stSelectbox div[data-baseweb="select"] > div {
-        background-color: var(--secondary-background-color) !important;
-        color: var(--text-color) !important;
-        border-color: rgba(128, 128, 128, 0.3) !important;
-    }
-    
-    header {visibility: hidden;}
-    footer {visibility: hidden;}
-    </style>
-    """, unsafe_allow_html=True)
-
-inject_custom_css()
+</style>
+""", unsafe_allow_html=True)
 
 # ==============================================================================
-# 1. CẤU HÌNH DỮ LIỆU
+# 2. HÀM TIỀN XỬ LÝ DỮ LIỆU (QUAN TRỌNG)
 # ==============================================================================
-
-USER_DATA_FILE = "danh_sach_nguoi_dung_moi.csv"
-MOVIE_DATA_FILE = "data_phim_full_images.csv"
-GUEST_USER = "Guest_ZeroClick"
-
-if 'logged_in_user' not in st.session_state: st.session_state['logged_in_user'] = None
-if 'auth_mode' not in st.session_state: st.session_state['auth_mode'] = 'login'
-if 'last_profile_recommendations' not in st.session_state: st.session_state['last_profile_recommendations'] = pd.DataFrame()
-if 'show_profile_plot' not in st.session_state: st.session_state['show_profile_plot'] = False
-
-# ==============================================================================
-# 2. XỬ LÝ DỮ LIỆU (ĐÃ THÊM KHỬ TRÙNG LẶP)
-# ==============================================================================
-
-@st.cache_data
-def load_data(file_path):
-    try: return pd.read_csv(file_path).fillna("")
-    except: return pd.DataFrame()
-
-def parse_genres(genre_string):
-    if not isinstance(genre_string, str) or not genre_string: return set()
-    return set([g.strip().replace('"', '') for g in genre_string.split(',')])
-
 @st.cache_resource
-def load_and_preprocess_static_data():
-    try:
-        df = load_data(MOVIE_DATA_FILE)
-        if df.empty: return pd.DataFrame(), np.array([[]]), []
-        df.columns = [col.strip() for col in df.columns]
+def load_and_process_data():
+    # Load data
+    movies = pd.read_csv("data_phim_full_images.csv")
+    users = pd.read_csv("danh_sach_nguoi_dung_moi.csv")
 
-        # --- FIX QUAN TRỌNG: LOẠI BỎ CÁC PHIM TRÙNG TÊN NGAY TỪ ĐẦU ---
-        # Giữ lại phim đầu tiên tìm thấy, bỏ các phim trùng tên phía sau
-        if 'Tên phim' in df.columns:
-            df = df.drop_duplicates(subset=['Tên phim'], keep='first').reset_index(drop=True)
-
-        # Tạo đặc trưng để so sánh
-        df["combined_features"] = (df["Đạo diễn"].astype(str) + " " + df["Diễn viên chính"].astype(str) + " " + df["Thể loại phim"].astype(str))
-        tfidf_matrix = TfidfVectorizer(stop_words='english').fit_transform(df["combined_features"])
-        cosine_sim = cosine_similarity(tfidf_matrix, tfidf_matrix)
-
-        # Chuẩn hóa độ phổ biến
-        if 'Độ phổ biến' in df.columns:
-            df['Độ phổ biến'] = pd.to_numeric(df['Độ phổ biến'], errors='coerce').fillna(0)
-            df["popularity_norm"] = MinMaxScaler().fit_transform(df[["Độ phổ biến"]])
-        else: df["popularity_norm"] = 0.5
-
-        # Xử lý thể loại và năm
-        df['parsed_genres'] = df['Thể loại phim'].apply(parse_genres)
-        df['year_numeric'] = pd.to_numeric(df.get('Năm phát hành', 0), errors='coerce').fillna(0).astype(int)
-        df['recency_score'] = df['year_numeric'].apply(lambda x: 1.0 if x >= 2024 else (0.8 if x >= 2020 else 0.5))
-
-        all_genres = set()
-        for g in df['Thể loại phim']:
-            if g: all_genres.update([x.strip() for x in str(g).split(',')])
-            
-        return df, cosine_sim, sorted(list(all_genres))
-    except Exception as e:
-        st.error(f"Lỗi xử lý dữ liệu: {e}")
-        return pd.DataFrame(), np.array([[]]), []
-
-def initialize_user_data():
-    if 'df_users' not in st.session_state:
-        st.session_state['df_users'] = load_data(USER_DATA_FILE)
-        if st.session_state['df_users'].empty:
-            st.session_state['df_users'] = pd.DataFrame(columns=['ID', 'Tên người dùng', '5 phim coi gần nhất', 'Phim yêu thích nhất', 'Thể loại yêu thích'])
-    return st.session_state['df_users']
-
-def get_unique_movie_titles(df):
-    return df['Tên phim'].dropna().unique().tolist() if 'Tên phim' in df.columns else []
-
-# ==============================================================================
-# 3. HELPER HIỂN THỊ (GRID 5 CỘT)
-# ==============================================================================
-
-def display_movie_grid(df_result, title=None):
-    if title: st.markdown(f"### {title}")
+    # --- Xử lý dữ liệu Movies ---
+    # 1. Điền giá trị trống
+    movies['Đạo diễn'] = movies['Đạo diễn'].fillna('')
+    movies['Thể loại phim'] = movies['Thể loại phim'].fillna('')
+    movies['Mô tả'] = movies['Mô tả'].fillna('')
     
-    if df_result.empty:
-        st.info("Chưa có dữ liệu.")
+    # 2. Tạo cột đặc trưng kết hợp (Combined Features) cho AI
+    # Kết hợp Tên phim + Đạo diễn + Thể loại
+    movies['combined_features'] = (
+        movies['Tên phim'] + " " + 
+        movies['Đạo diễn'] + " " + 
+        movies['Thể loại phim']
+    )
+
+    # 3. Chuẩn hóa độ phổ biến (Scaling Popularity) về khoảng 0-1
+    # Để có thể cộng trọng số với điểm cosine similarity (vốn cũng là 0-1)
+    scaler = MinMaxScaler()
+    movies['popularity_scaled'] = scaler.fit_transform(movies[['Độ phổ biến']])
+
+    # 4. Tạo ma trận TF-IDF
+    tfidf = TfidfVectorizer(stop_words='english')
+    tfidf_matrix = tfidf.fit_transform(movies['combined_features'])
+
+    # 5. Tính ma trận tương đồng Cosine
+    cosine_sim = cosine_similarity(tfidf_matrix, tfidf_matrix)
+
+    # --- Xử lý dữ liệu Users ---
+    # Chuyển chuỗi list "['Phim A', 'Phim B']" thành list Python thật
+    users['history_list'] = users['5 phim coi gần nhất'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else [])
+
+    # Lấy danh sách tất cả thể loại để dùng cho Dropdown
+    all_genres = set()
+    for genres in movies['Thể loại phim']:
+        for g in genres.split(','):
+            all_genres.add(g.strip())
+    
+    return movies, users, cosine_sim, sorted(list(all_genres))
+
+# Gọi hàm load dữ liệu
+movies_df, users_df, cosine_sim, ALL_GENRES = load_and_process_data()
+
+# ==============================================================================
+# 3. CÁC HÀM CHỨC NĂNG CỐT LÕI (ALGORITHMS)
+# ==============================================================================
+
+def get_ai_recommendations(history_titles, top_k=10, w_sim=0.7, w_pop=0.3):
+    """
+    Chức năng 1: Đề xuất AI dựa trên trọng số (Similarity + Popularity)
+    """
+    # Tìm index của các phim trong lịch sử xem
+    indices = []
+    for title in history_titles:
+        idx = movies_df[movies_df['Tên phim'] == title].index
+        if not idx.empty:
+            indices.append(idx[0])
+    
+    if not indices:
+        return movies_df.sort_values(by='Độ phổ biến', ascending=False).head(top_k)
+
+    # Tính điểm tương đồng trung bình với lịch sử xem
+    # Lấy các dòng tương ứng với phim đã xem trong ma trận cosine, sau đó tính trung bình dọc
+    sim_scores = np.mean(cosine_sim[indices], axis=0)
+    
+    # Lấy điểm phổ biến đã chuẩn hóa
+    pop_scores = movies_df['popularity_scaled'].values
+    
+    # Tính điểm lai (Hybrid Score)
+    final_scores = (w_sim * sim_scores) + (w_pop * pop_scores)
+    
+    # Sắp xếp và lấy top k (loại bỏ phim đã xem)
+    # Tạo list tuple (index, score)
+    scores_with_idx = list(enumerate(final_scores))
+    scores_with_idx = sorted(scores_with_idx, key=lambda x: x[1], reverse=True)
+    
+    rec_indices = [i[0] for i in scores_with_idx if i[0] not in indices][:top_k]
+    return movies_df.iloc[rec_indices]
+
+def search_movie_func(query):
+    """
+    Chức năng 2: Tìm kiếm phim và gợi ý tương tự
+    """
+    # Tìm kiếm gần đúng (chứa chuỗi)
+    result = movies_df[movies_df['Tên phim'].str.contains(query, case=False, na=False)]
+    return result
+
+def get_genre_recommendations(selected_genres, top_k=10):
+    """
+    Chức năng 3: Đề xuất dựa trên thể loại
+    """
+    if not selected_genres:
+        return pd.DataFrame()
+    
+    # Lọc các phim có chứa ÍT NHẤT 1 trong các thể loại đã chọn
+    # Tạo regex pattern ví dụ: "Hành động|Hài"
+    pattern = '|'.join(selected_genres)
+    filtered = movies_df[movies_df['Thể loại phim'].str.contains(pattern, case=False, na=False)]
+    
+    if filtered.empty:
+        return pd.DataFrame()
+    
+    # Sắp xếp theo độ phổ biến để gợi ý phim hay nhất trong thể loại đó
+    return filtered.sort_values(by='Độ phổ biến', ascending=False).head(top_k)
+
+def draw_user_charts(history_titles):
+    """
+    Vẽ biểu đồ thống kê xu hướng xem phim
+    """
+    if not history_titles:
+        st.warning("Chưa có dữ liệu lịch sử để vẽ biểu đồ.")
         return
 
-    # --- LỌC TRÙNG LẶP LẦN CUỐI TRƯỚC KHI HIỂN THỊ ---
-    # Đảm bảo danh sách hiển thị không có phim trùng nhau
-    if 'Tên phim' in df_result.columns:
-        df_result = df_result.drop_duplicates(subset=['Tên phim'], keep='first')
-
-    cols = st.columns(5)
-    for index, (i, row) in enumerate(df_result.iterrows()):
-        with cols[index % 5]:
-            with st.container():
-                st.markdown('<div class="movie-card-container">', unsafe_allow_html=True)
-                
-                # Poster
-                poster = row.get('Link Poster', '')
-                if isinstance(poster, str) and poster.startswith('http'):
-                    st.image(poster, use_container_width=True)
-                else:
-                    st.markdown(f"""<div style="background:rgba(128,128,128,0.2);height:380px;display:flex;align-items:center;justify-content:center;border-radius:8px;color:var(--text-color);">No Image</div>""", unsafe_allow_html=True)
-
-                # Info
-                st.markdown(f"#### {row['Tên phim']}")
-                st.markdown(f"<div class='small-text'>📅 {row.get('Năm phát hành', 'N/A')}</div>", unsafe_allow_html=True)
-
-                # Score
-                score = row.get('final_score', row.get('weighted_score', 0))
-                st.progress(min(score / 10.0, 1.0))
-                
-                st.markdown('</div>', unsafe_allow_html=True)
-
-# ==============================================================================
-# 4. LOGIC ĐỀ XUẤT
-# ==============================================================================
-
-def get_recommendations_weighted_genres(selected_genres, df, num=10):
-    pattern = '|'.join([re.escape(g) for g in selected_genres])
-    filtered = df[df['Thể loại phim'].astype(str).str.contains(pattern, case=False, na=False)].copy()
-    if filtered.empty: return pd.DataFrame()
+    # Lấy danh sách thể loại từ các phim đã xem
+    genres_count = []
+    for title in history_titles:
+        movie_row = movies_df[movies_df['Tên phim'] == title]
+        if not movie_row.empty:
+            g_str = movie_row.iloc[0]['Thể loại phim']
+            g_list = [x.strip() for x in g_str.split(',')]
+            genres_count.extend(g_list)
     
-    filtered['final_score'] = filtered.apply(lambda x: x['popularity_norm']*2 + sum(1 for g in selected_genres if g in str(x['Thể loại phim']))*1.5 + x['recency_score'], axis=1)
-    
-    # Sort và lấy top, sau đó drop duplicates lần nữa để chắc chắn
-    return filtered.sort_values('final_score', ascending=False).drop_duplicates(subset=['Tên phim']).head(num)
+    if not genres_count:
+        st.warning("Không tìm thấy thông tin thể loại.")
+        return
 
-def recommend_movies_smart(movie_name, df, cosine_sim):
-    try:
-        # Tìm index phim chính xác
-        idx = df[df['Tên phim'].astype(str).str.lower() == movie_name.lower()].index[0]
-        
-        sim_scores = list(enumerate(cosine_sim[idx]))
-        res = pd.merge(df, pd.DataFrame(sim_scores, columns=['index', 'similarity']), left_index=True, right_on='index')
-        res['weighted_score'] = res['similarity']*0.7 + res['popularity_norm']*0.3
-        
-        # Loại bỏ chính phim đang tìm kiếm và các phim trùng tên
-        return res.drop(idx).sort_values('weighted_score', ascending=False).drop_duplicates(subset=['Tên phim']).head(10)
-    except: return pd.DataFrame()
+    # Đếm số lượng
+    counts = Counter(genres_count)
+    df_chart = pd.DataFrame.from_dict(counts, orient='index', columns=['Count']).reset_index()
+    df_chart.columns = ['Thể loại', 'Số phim đã xem']
+    df_chart = df_chart.sort_values(by='Số phim đã xem', ascending=False)
+
+    # Vẽ biểu đồ
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+    
+    # Biểu đồ 1: Pie Chart (Phân bố)
+    ax1.pie(df_chart['Số phim đã xem'], labels=df_chart['Thể loại'], autopct='%1.1f%%', startangle=90, colors=sns.color_palette('pastel'))
+    ax1.set_title('Phân bố thể loại đã xem')
+
+    # Biểu đồ 2: Bar Chart (Số lượng)
+    sns.barplot(x='Số phim đã xem', y='Thể loại', data=df_chart, ax=ax2, palette='viridis')
+    ax2.set_title('Số lượng phim theo thể loại')
+    
+    st.pyplot(fig)
 
 # ==============================================================================
-# 5. GIAO DIỆN CHÍNH
+# 4. GIAO DIỆN NGƯỜI DÙNG (UI)
 # ==============================================================================
 
-def main_page(df_movies, cosine_sim, sorted_genres):
-    username = st.session_state['logged_in_user']
-    is_guest = username == GUEST_USER
+# --- Session State Management ---
+if 'user_mode' not in st.session_state:
+    st.session_state.user_mode = None  # 'member', 'guest', 'register'
+if 'current_user' not in st.session_state:
+    st.session_state.current_user = None
+if 'user_genres' not in st.session_state: # Cho Guest/Register
+    st.session_state.user_genres = []
+
+# --- Sidebar ---
+with st.sidebar:
+    st.title("🎬 DreamStream")
+    st.write("Hệ thống gợi ý phim thông minh")
     
-    with st.sidebar:
-        st.markdown(f"**👤 {username}**")
-        menu = st.radio("Menu", ['Trang Chủ', 'Tìm kiếm', 'Thoát'], label_visibility="collapsed")
-        if menu == 'Thoát':
-            st.session_state['logged_in_user'] = None
+    if st.session_state.user_mode == 'member':
+        st.success(f"Xin chào, {st.session_state.current_user['Tên người dùng']}!")
+        menu = st.radio("Chức năng", ["Đề xuất AI", "Tìm kiếm Phim", "Theo Thể loại Yêu thích", "Thống kê Cá nhân"])
+        if st.button("Đăng xuất"):
+            st.session_state.user_mode = None
+            st.session_state.current_user = None
             st.rerun()
+            
+    elif st.session_state.user_mode in ['guest', 'register']:
+        st.info(f"Chế độ: {st.session_state.user_mode.upper()}")
+        menu = st.radio("Chức năng", ["Đề xuất AI (Cơ bản)", "Theo Thể loại Đã chọn"])
+        if st.button("Thoát chế độ Khách"):
+            st.session_state.user_mode = None
+            st.session_state.user_genres = []
+            st.rerun()
+            
+    else:
+        st.warning("Vui lòng đăng nhập hoặc chọn chế độ khách.")
+        menu = "Login"
 
-    # --- KHÁCH ---
-    if is_guest:
-        st.caption("🔍 Chế độ khách: Chọn thể loại bên dưới")
-        if hasattr(st, 'pills'):
-            genres = st.pills("", sorted_genres, selection_mode="multi")
-        else:
-            genres = st.multiselect("", sorted_genres)
+# --- Main Content ---
+
+# 1. MÀN HÌNH LOGIN / REGISTER
+if st.session_state.user_mode is None:
+    tab1, tab2, tab3 = st.tabs(["Đăng nhập Thành viên", "Đăng ký Mới", "Chế độ Khách"])
+    
+    with tab1: # Login
+        username = st.text_input("Tên đăng nhập")
+        if st.button("Đăng nhập"):
+            user_row = users_df[users_df['Tên người dùng'] == username]
+            if not user_row.empty:
+                st.session_state.user_mode = 'member'
+                st.session_state.current_user = user_row.iloc[0]
+                st.toast("Đăng nhập thành công!", icon="✅")
+                st.rerun()
+            else:
+                st.error("Tên người dùng không tồn tại.")
+
+    with tab2: # Register
+        new_user = st.text_input("Tạo tên người dùng mới")
+        selected_g = st.multiselect("Chọn thể loại bạn thích:", ALL_GENRES, key='reg_genres')
+        if st.button("Đăng ký & Vào ngay"):
+            if new_user and selected_g:
+                st.session_state.user_mode = 'register'
+                st.session_state.current_user = {'Tên người dùng': new_user}
+                st.session_state.user_genres = selected_g
+                st.rerun()
+            else:
+                st.warning("Vui lòng nhập tên và chọn ít nhất 1 thể loại.")
+
+    with tab3: # Guest
+        guest_g = st.multiselect("Chọn thể loại muốn xem:", ALL_GENRES, key='guest_genres')
+        if st.button("Truy cập ngay"):
+            if guest_g:
+                st.session_state.user_mode = 'guest'
+                st.session_state.user_genres = guest_g
+                st.rerun()
+            else:
+                st.warning("Vui lòng chọn ít nhất 1 thể loại.")
+
+# 2. CHỨC NĂNG DÀNH CHO THÀNH VIÊN CŨ
+elif st.session_state.user_mode == 'member':
+    user_history = st.session_state.current_user['history_list']
+    
+    if menu == "Đề xuất AI":
+        st.header(f"🤖 Đề xuất Phim Thông minh cho {st.session_state.current_user['Tên người dùng']}")
+        st.write("Dựa trên sự kết hợp giữa **lịch sử xem** và **độ phổ biến** của phim.")
+        
+        st.subheader("Lịch sử xem gần nhất của bạn:")
+        st.write(", ".join(user_history))
         
         st.markdown("---")
-        if genres:
-            display_movie_grid(get_recommendations_weighted_genres(genres, df_movies), "Kết quả")
+        st.subheader("Gợi ý dành riêng cho bạn:")
+        
+        recs = get_ai_recommendations(user_history)
+        
+        # Hiển thị kết quả dạng lưới
+        cols = st.columns(5)
+        for i, (idx, row) in enumerate(recs.iterrows()):
+            with cols[i % 5]:
+                st.image(row['Link Poster'], use_container_width=True)
+                st.caption(f"**{row['Tên phim']}**")
+                with st.expander("Chi tiết"):
+                    st.write(f"⭐ {row['Độ phổ biến']:.1f}")
+                    st.write(f"🎭 {row['Thể loại phim']}")
+
+    elif menu == "Tìm kiếm Phim":
+        st.header("🔍 Tìm kiếm Phim")
+        search_query = st.text_input("Nhập tên phim cần tìm:", "")
+        
+        if search_query:
+            results = search_movie_func(search_query)
+            if not results.empty:
+                selected_movie = results.iloc[0] # Lấy kết quả đầu tiên
+                
+                c1, c2 = st.columns([1, 2])
+                with c1:
+                    st.image(selected_movie['Link Poster'], width=300)
+                with c2:
+                    st.title(selected_movie['Tên phim'])
+                    st.write(f"**Đạo diễn:** {selected_movie['Đạo diễn']}")
+                    st.write(f"**Thể loại:** {selected_movie['Thể loại phim']}")
+                    st.write(f"**Mô tả:** {selected_movie['Mô tả']}")
+                    
+                st.markdown("---")
+                st.subheader("Phim tương tự (Similar Movies):")
+                # Tìm phim tương tự dựa trên content của phim đang xem
+                sim_recs = get_ai_recommendations([selected_movie['Tên phim']], top_k=5, w_sim=1.0, w_pop=0.0)
+                
+                cols = st.columns(5)
+                for i, (idx, row) in enumerate(sim_recs.iterrows()):
+                    with cols[i]:
+                        st.image(row['Link Poster'], use_container_width=True)
+                        st.caption(row['Tên phim'])
+            else:
+                st.warning("Không tìm thấy phim nào.")
+
+    elif menu == "Theo Thể loại Yêu thích":
+        st.header("❤️ Đề xuất theo Thể loại Yêu thích")
+        # Với user cũ, lấy từ cột Phim yêu thích nhất để suy ra thể loại, hoặc dùng lịch sử
+        fav_movie = st.session_state.current_user['Phim yêu thích nhất']
+        st.write(f"Phim yêu thích nhất của bạn: **{fav_movie}**")
+        
+        # Lấy thể loại của phim yêu thích này
+        row = movies_df[movies_df['Tên phim'] == fav_movie]
+        if not row.empty:
+            genres_str = row.iloc[0]['Thể loại phim']
+            fav_genres = [x.strip() for x in genres_str.split(',')]
+            
+            st.info(f"Hệ thống xác định thể loại yêu thích của bạn là: **{', '.join(fav_genres)}**")
+            
+            recs = get_genre_recommendations(fav_genres)
+            cols = st.columns(5)
+            for i, (idx, r) in enumerate(recs.iterrows()):
+                with cols[i % 5]:
+                    st.image(r['Link Poster'], use_container_width=True)
+                    st.caption(r['Tên phim'])
         else:
-            # Drop duplicates khi hiển thị danh sách mặc định
-            display_movie_grid(df_movies.sort_values(['year_numeric', 'popularity_norm'], ascending=False).drop_duplicates(subset=['Tên phim']).head(10), "🔥 Phim Mới & Hot")
-        return
+            st.error("Không tìm thấy thông tin phim yêu thích trong dữ liệu.")
 
-    # --- TÌM KIẾM ---
-    if menu == 'Tìm kiếm':
-        c1, c2 = st.columns([6, 1], vertical_alignment="bottom") 
-        with c1:
-            selected_movie = st.selectbox("Chọn phim", get_unique_movie_titles(df_movies), label_visibility="collapsed", placeholder="Nhập tên phim...")
-        with c2:
-            search_btn = st.button("🔍", use_container_width=True, type="primary")
+    elif menu == "Thống kê Cá nhân":
+        st.header("📊 Thống kê Xu hướng Xem phim")
+        draw_user_charts(user_history)
 
-        st.markdown("---")
+# 3. CHỨC NĂNG DÀNH CHO KHÁCH / NGƯỜI ĐĂNG KÝ
+elif st.session_state.user_mode in ['guest', 'register']:
+    
+    selected_g = st.session_state.user_genres
+    
+    if menu == "Đề xuất AI (Cơ bản)":
+        # Với khách, AI sẽ dựa trên thể loại họ chọn + độ phổ biến
+        st.header("✨ Đề xuất Phim (Dựa trên lựa chọn của bạn)")
+        st.write(f"Các thể loại bạn quan tâm: {', '.join(selected_g)}")
         
-        if search_btn:
-            res = recommend_movies_smart(selected_movie, df_movies, cosine_sim)
-            display_movie_grid(res, f"Kết quả tương tự: {selected_movie}")
-        else:
-            display_movie_grid(df_movies.sort_values('popularity_norm', ascending=False).drop_duplicates(subset=['Tên phim']).head(10), "🎬 Đề xuất hôm nay")
-
-    # --- TRANG CHỦ ---
-    elif menu == 'Trang Chủ':
-        c_title, c_btn = st.columns([6, 1])
-        with c_title: st.markdown("### ✨ Gợi ý hôm nay")
-        with c_btn: 
-            if st.button("🔄", use_container_width=True):
-                # Random 10 phim unique
-                st.session_state['last_profile_recommendations'] = df_movies.drop_duplicates(subset=['Tên phim']).sample(10)
+        # Dùng hàm genre recommendation nhưng hiển thị dưới dạng 'AI' (phổ biến nhất trong thể loại đó)
+        recs = get_genre_recommendations(selected_g, top_k=10)
         
-        recs = st.session_state.get('last_profile_recommendations', pd.DataFrame())
-        if recs.empty: recs = df_movies.sort_values('popularity_norm', ascending=False).drop_duplicates(subset=['Tên phim']).head(10)
-        
-        display_movie_grid(recs)
+        cols = st.columns(5)
+        for i, (idx, row) in enumerate(recs.iterrows()):
+            with cols[i % 5]:
+                st.image(row['Link Poster'], use_container_width=True)
+                st.caption(row['Tên phim'])
+                
+    elif menu == "Theo Thể loại Đã chọn":
+        st.header("📂 Duyệt phim theo Thể loại")
+        # Cho phép lọc kỹ hơn trong các thể loại đã chọn
+        sub_genre = st.selectbox("Chọn cụ thể:", selected_g)
+        if sub_genre:
+            recs = get_genre_recommendations([sub_genre], top_k=10)
+            cols = st.columns(5)
+            for i, (idx, row) in enumerate(recs.iterrows()):
+                with cols[i % 5]:
+                    st.image(row['Link Poster'], use_container_width=True)
+                    st.caption(row['Tên phim'])
 
-# ==============================================================================
-# AUTH PAGE
-# ==============================================================================
-def authentication_page(df_movies, sorted_genres):
-    st.markdown("<h1 style='text-align:center;font-size:3rem;'>🎬 CINEMATCH</h1>", unsafe_allow_html=True)
-    c1, c2, c3 = st.columns([1, 2, 1])
-    with c2:
-        tab1, tab2 = st.tabs(["Đăng Nhập", "Đăng Ký"])
-        with tab1:
-            with st.form("login"):
-                u = st.text_input("Username")
-                if st.form_submit_button("Đăng Nhập", use_container_width=True):
-                    users = st.session_state['df_users']
-                    if not users.empty and u in users['Tên người dùng'].values:
-                        st.session_state['logged_in_user'] = u; st.rerun()
-                    else: st.error("Sai username")
-            if st.button("Chế độ Khách", use_container_width=True):
-                st.session_state['logged_in_user'] = GUEST_USER; st.rerun()
-        
-        with tab2:
-            with st.form("reg"):
-                new_u = st.text_input("Username mới")
-                fav = st.selectbox("Phim thích", [""] + get_unique_movie_titles(df_movies))
-                g = st.multiselect("Thể loại", sorted_genres)
-                if st.form_submit_button("Đăng Ký", type="primary", use_container_width=True):
-                    users = st.session_state['df_users']
-                    if new_u and (users.empty or new_u not in users['Tên người dùng'].values):
-                        row = {'ID': len(users)+1, 'Tên người dùng': new_u, '5 phim coi gần nhất': "[]", 'Phim yêu thích nhất': fav, 'Thể loại yêu thích': ",".join(g)}
-                        st.session_state['df_users'] = pd.concat([users, pd.DataFrame([row])], ignore_index=True)
-                        st.success("OK!"); st.rerun()
-                    else: st.error("Lỗi đăng ký")
-
-if __name__ == '__main__':
-    df, sim, genres = load_and_preprocess_static_data()
-    initialize_user_data()
-    if st.session_state['logged_in_user']: main_page(df, sim, genres)
-    else: authentication_page(df, genres)
