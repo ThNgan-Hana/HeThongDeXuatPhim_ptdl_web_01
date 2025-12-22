@@ -101,10 +101,7 @@ movies_df, users_df, cosine_sim, ALL_GENRES = load_and_process_data()
 # 3. CÁC HÀM CHỨC NĂNG CỐT LÕI (ALGORITHMS)
 # ==============================================================================
 
-def get_ai_recommendations(history_titles, top_k=10, w_sim=0.7, w_pop=0.3):
-    """
-    Chức năng 1: Đề xuất AI dựa trên trọng số (Similarity + Popularity)
-    """
+def get_ai_recommendations(history_titles, top_k=10, w_sim=0.7, w_pop=0.3, exclude=None):
     # Tìm index của các phim trong lịch sử xem
     indices = []
     for title in history_titles:
@@ -112,27 +109,33 @@ def get_ai_recommendations(history_titles, top_k=10, w_sim=0.7, w_pop=0.3):
         if not idx.empty:
             indices.append(idx[0])
     
+    # Nếu không có lịch sử, trả về top phổ biến (trừ những phim trong exclude)
     if not indices:
-        return movies_df.sort_values(by='Độ phổ biến', ascending=False).head(top_k)
+        if exclude is None: exclude = []
+        popular_movies = movies_df.drop(exclude, errors='ignore').sort_values(by='Độ phổ biến', ascending=False)
+        recs = popular_movies.head(top_k)
+        return recs, recs.index.tolist()
 
-    # Tính điểm tương đồng trung bình với lịch sử xem
-    # Lấy các dòng tương ứng với phim đã xem trong ma trận cosine, sau đó tính trung bình dọc
+    # Tính điểm tương đồng
     sim_scores = np.mean(cosine_sim[indices], axis=0)
-    
-    # Lấy điểm phổ biến đã chuẩn hóa
     pop_scores = movies_df['popularity_scaled'].values
-    
-    # Tính điểm lai (Hybrid Score)
     final_scores = (w_sim * sim_scores) + (w_pop * pop_scores)
     
-    # Sắp xếp và lấy top k (loại bỏ phim đã xem)
-    # Tạo list tuple (index, score)
+    # Sắp xếp
     scores_with_idx = list(enumerate(final_scores))
     scores_with_idx = sorted(scores_with_idx, key=lambda x: x[1], reverse=True)
     
-    rec_indices = [i[0] for i in scores_with_idx if i[0] not in indices][:top_k]
-    return movies_df.iloc[rec_indices]
-
+    # Lọc bỏ phim đã xem (history) VÀ phim đã hiển thị (exclude)
+    if exclude is None: exclude = []
+    
+    final_indices = []
+    for i, score in scores_with_idx:
+        if i not in indices and i not in exclude:
+            final_indices.append(i)
+            if len(final_indices) >= top_k:
+                break
+    
+    return movies_df.iloc[final_indices], final_indices
 def search_movie_func(query):
     """
     Chức năng 2: Tìm kiếm phim và gợi ý tương tự
@@ -296,25 +299,42 @@ if st.session_state.user_mode is None:
                 st.warning("Vui lòng chọn ít nhất 1 thể loại.")
 
 # 2. CHỨC NĂNG DÀNH CHO THÀNH VIÊN CŨ
-elif st.session_state.user_mode == 'member':
-    user_history = st.session_state.current_user['history_list']
-    
-    if menu == "Đề xuất AI":
-        if st.button("🔄 Tạo mới"):
-            st.session_state.ai_seen.clear()
-
-        recs, idxs = get_ai_recommendations(history, exclude=st.session_state.ai_seen)
-        st.session_state.ai_seen.update(idxs)
+elif menu == "Đề xuất AI":
         st.header(f"🤖 Đề xuất Phim Thông minh cho {st.session_state.current_user['Tên người dùng']}")
-        st.write("Dựa trên sự kết hợp giữa **lịch sử xem** và **độ phổ biến** của phim.")
+        # ... (các dòng hiển thị text giữ nguyên) ...
         
-        st.subheader("Lịch sử xem gần nhất của bạn:")
-        st.write(", ".join(user_history))
-        
-        st.markdown("---")
-        st.subheader("Gợi ý dành riêng cho bạn:")
-        
-        recs = get_ai_recommendations(user_history)
+        # Khởi tạo session state để lưu các phim đã hiển thị (nếu chưa có)
+        if 'ai_seen' not in st.session_state:
+            st.session_state.ai_seen = []
+
+        # Nút làm mới danh sách
+        if st.button("🔄 Làm mới đề xuất"):
+            # Gọi hàm với user_history (đúng tên biến) và danh sách loại trừ
+            recs, idxs = get_ai_recommendations(
+                user_history, 
+                exclude=st.session_state.ai_seen
+            )
+            
+            # Cập nhật danh sách đã xem vào session_state
+            if idxs:
+                st.session_state.ai_seen.extend(idxs)
+            
+            # Hiển thị phim (Copy đoạn hiển thị cũ vào đây)
+            cols = st.columns(5)
+            for i, (idx, row) in enumerate(recs.iterrows()):
+                with cols[i % 5]:
+                    st.image(row['Link Poster'], use_container_width=True)
+                    st.caption(f"**{row['Tên phim']}**")
+        else:
+            # Mặc định lần đầu load
+            recs, idxs = get_ai_recommendations(user_history) # Không exclude lần đầu
+            st.session_state.ai_seen = idxs # Lưu lại để lần sau loại trừ
+            
+            cols = st.columns(5)
+            for i, (idx, row) in enumerate(recs.iterrows()):
+                with cols[i % 5]:
+                    st.image(row['Link Poster'], use_container_width=True)
+                    st.caption(f"**{row['Tên phim']}**")
         
         # Hiển thị kết quả dạng lưới
         cols = st.columns(5)
@@ -401,6 +421,7 @@ elif st.session_state.user_mode in ['guest', 'register']:
                 with cols[i % 5]:
                     st.image(row['Link Poster'], use_container_width=True)
                     st.caption(row['Tên phim'])
+
 
 
 
