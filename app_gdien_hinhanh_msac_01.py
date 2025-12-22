@@ -408,30 +408,72 @@ elif st.session_state.user_mode == 'member':
 
 
 # 3. CHỨC NĂNG DÀNH CHO KHÁCH / NGƯỜI ĐĂNG KÝ
+# 3. CHỨC NĂNG DÀNH CHO KHÁCH / NGƯỜI ĐĂNG KÝ
 elif st.session_state.user_mode in ['guest', 'register']:
     
     selected_g = st.session_state.user_genres
     
     if menu == "Theo Thể loại Đã chọn":
         st.header("📂 Duyệt phim theo Thể loại")
-        # Cho phép lọc kỹ hơn trong các thể loại đã chọn
+        
+        # Selectbox chọn thể loại
         sub_genre = st.selectbox("Chọn cụ thể:", selected_g)
         
-        if sub_genre:
-            recs = get_genre_recommendations([sub_genre], top_k=10)
-            
-            if not recs.empty:
-                cols = st.columns(5)
-                for i, (idx, row) in enumerate(recs.iterrows()):
-                    with cols[i % 5]:
-                        st.image(row['Link Poster'], use_container_width=True)
-                        st.write(f"**{row['Tên phim']}**")
-                        
-                        # --- Thêm nút xem chi tiết ---
-                        with st.expander("ℹ️ Chi tiết"):
-                            st.write(f"🎬 **Đạo diễn:** {row['Đạo diễn']}")
-                            st.write(f"🏷️ **Thể loại:** {row['Thể loại phim']}")
-                            st.write(f"⭐ **Điểm:** {round(row['Độ phổ biến'], 1)}")
-                            st.caption(f"📝 {row['Mô tả'][:100]}...")
-            else:
-                st.warning("Chưa có dữ liệu cho thể loại này.")
+        # --- LOGIC QUẢN LÝ TRẠNG THÁI (STATE) ---
+        # 1. Khởi tạo các biến nhớ (session_state) nếu chưa có
+        if 'guest_current_genre' not in st.session_state:
+            st.session_state.guest_current_genre = None # Lưu thể loại đang chọn
+        if 'guest_seen_ids' not in st.session_state:
+            st.session_state.guest_seen_ids = []        # Lưu danh sách ID phim đã hiện (để tránh lặp)
+        if 'guest_recs_df' not in st.session_state:
+            st.session_state.guest_recs_df = None       # Lưu DataFrame phim đang hiển thị trên màn hình
+
+        # 2. Kiểm tra: Nếu người dùng đổi sang thể loại khác -> Reset lại từ đầu
+        if sub_genre != st.session_state.guest_current_genre:
+            st.session_state.guest_current_genre = sub_genre
+            st.session_state.guest_seen_ids = []  # Xóa lịch sử đã xem cũ
+            st.session_state.guest_recs_df = None # Xóa phim đang hiện cũ
+            # (Streamlit sẽ chạy tiếp xuống dưới để tải dữ liệu mới)
+
+        # 3. Xử lý nút "Làm mới" HOẶC Tải lần đầu
+        col_btn, col_empty = st.columns([1, 4])
+        is_click_refresh = col_btn.button("🔄 Làm mới đề xuất")
+        
+        # Logic tải dữ liệu chạy khi: (Bấm nút Làm mới) HOẶC (Chưa có phim nào đang hiện)
+        if is_click_refresh or st.session_state.guest_recs_df is None:
+            if sub_genre:
+                # Gọi hàm get_genre_recommendations với tham số exclude
+                # để loại bỏ những phim đã nằm trong danh sách guest_seen_ids
+                new_recs = get_genre_recommendations(
+                    [sub_genre], 
+                    top_k=10, 
+                    exclude=st.session_state.guest_seen_ids
+                )
+                
+                if not new_recs.empty:
+                    # Lưu phim mới vào state để hiển thị
+                    st.session_state.guest_recs_df = new_recs
+                    # Cập nhật danh sách ID đã xem vào kho lưu trữ
+                    st.session_state.guest_seen_ids.extend(new_recs.index.tolist())
+                    
+                    if is_click_refresh:
+                        st.success("Đã làm mới danh sách phim!")
+                else:
+                    # Nếu không còn phim nào mới để hiện
+                    st.warning("Đã hiển thị hết các phim nổi bật thuộc thể loại này!")
+        
+        # --- 4. HIỂN THỊ DANH SÁCH PHIM TỪ STATE RA MÀN HÌNH ---
+        if st.session_state.guest_recs_df is not None and not st.session_state.guest_recs_df.empty:
+            cols = st.columns(5)
+            for i, (idx, row) in enumerate(st.session_state.guest_recs_df.iterrows()):
+                with cols[i % 5]:
+                    st.image(row['Link Poster'], use_container_width=True)
+                    st.write(f"**{row['Tên phim']}**")
+                    
+                    # Expander xem chi tiết (Giống giao diện Member)
+                    with st.expander("ℹ️ Chi tiết"):
+                        st.write(f"🎬 **Đạo diễn:** {row['Đạo diễn']}")
+                        st.write(f"🏷️ **Thể loại:** {row['Thể loại phim']}")
+                        st.write(f"⭐ **Điểm:** {round(row['Độ phổ biến'], 1)}")
+                        st.caption(f"📝 {row['Mô tả'][:100]}...")
+
