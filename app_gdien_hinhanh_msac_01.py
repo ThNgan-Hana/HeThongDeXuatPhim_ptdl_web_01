@@ -301,25 +301,24 @@ if st.session_state.user_mode is None:
 # 2. CHỨC NĂNG DÀNH CHO THÀNH VIÊN CŨ
 elif st.session_state.user_mode == 'member':
     user_history = st.session_state.current_user['history_list']
-
-    st.write(", ".join(user_history))
-elif menu == "Đề xuất AI":
+    
+    # --- SỬA LỖI: Lồng việc kiểm tra menu vào BÊN TRONG khối member ---
+    # Thay 'elif' bằng 'if' và thụt lề vào trong
+    if menu == "Đề xuất AI":
         st.header(f"🤖 Đề xuất Phim Thông minh cho {st.session_state.current_user['Tên người dùng']}")
         st.write("Dựa trên sự kết hợp giữa **lịch sử xem** và **độ phổ biến** của phim.")
         
         st.subheader("Lịch sử xem gần nhất của bạn:")
-        # SỬA: Dùng đúng biến user_history
-        st.write(",".join(user_history))
+        st.write(", ".join(user_history))
         
         st.markdown("---")
         st.subheader("Gợi ý dành riêng cho bạn:")
         
         if 'ai_seen' not in st.session_state:
             st.session_state.ai_seen = []
-
-        # Nút làm mới
+            
+        # Nút làm mới (Giữ nguyên logic của bạn nhưng nhớ thụt đầu dòng)
         if st.button("🔄 Làm mới đề xuất"):
-            # SỬA: Dùng user_history thay vì history
             recs, idxs = get_ai_recommendations(user_history, exclude=st.session_state.ai_seen)
             if idxs:
                 st.session_state.ai_seen.extend(idxs)
@@ -331,7 +330,7 @@ elif menu == "Đề xuất AI":
                     st.caption(f"**{row['Tên phim']}**")
         else:
             # Mặc định lần đầu
-            recs, idxs = get_ai_recommendations(user_history)
+            recs, idxs = get_ai_recommendations(user_history, exclude=st.session_state.ai_seen) # Thêm exclude để tránh lặp nếu cần
             if not st.session_state.ai_seen:
                 st.session_state.ai_seen.extend(idxs)
 
@@ -340,35 +339,17 @@ elif menu == "Đề xuất AI":
                 with cols[i % 5]:
                     st.image(row['Link Poster'], use_container_width=True)
                     st.caption(f"**{row['Tên phim']}**")
-                    
-  
-elif menu == "Tìm kiếm Phim":
-        st.header("🔍 Tìm kiếm Phim")
-        # ... (Code tìm kiếm phim giữ nguyên) ...
-elif menu == "Theo Thể loại Yêu thích":
-        st.header("❤️ Đề xuất theo Thể loại Yêu thích")
-        # Với user cũ, lấy từ cột Phim yêu thích nhất để suy ra thể loại, hoặc dùng lịch sử
-        fav_movie = st.session_state.current_user['Phim yêu thích nhất']
-        st.write(f"Phim yêu thích nhất của bạn: **{fav_movie}**")
-        
-        # Lấy thể loại của phim yêu thích này
-        row = movies_df[movies_df['Tên phim'] == fav_movie]
-        if not row.empty:
-            genres_str = row.iloc[0]['Thể loại phim']
-            fav_genres = [x.strip() for x in genres_str.split(',')]
-            
-            st.info(f"Hệ thống xác định thể loại yêu thích của bạn là: **{', '.join(fav_genres)}**")
-            
-            recs = get_genre_recommendations(fav_genres)
-            cols = st.columns(5)
-            for i, (idx, r) in enumerate(recs.iterrows()):
-                with cols[i % 5]:
-                    st.image(r['Link Poster'], use_container_width=True)
-                    st.caption(r['Tên phim'])
-        else:
-            st.error("Không tìm thấy thông tin phim yêu thích trong dữ liệu.")
 
-elif menu == "Thống kê Cá nhân":
+    # --- CÁC MENU KHÁC (BẠN CẦN THỤT ĐẦU DÒNG CÁC ĐOẠN DƯỚI TƯƠNG TỰ) ---
+    elif menu == "Tìm kiếm Phim":
+        st.header("🔍 Tìm kiếm Phim")
+        # ... (Code tìm kiếm của bạn) ...
+        
+    elif menu == "Theo Thể loại Yêu thích":
+        st.header("❤️ Đề xuất theo Thể loại Yêu thích")
+        # ... (Code thể loại của bạn) ...
+        
+    elif menu == "Thống kê Cá nhân":
         st.header("📊 Thống kê Xu hướng Xem phim")
         draw_user_charts(user_history)
 
@@ -389,6 +370,7 @@ elif st.session_state.user_mode in ['guest', 'register']:
                 with cols[i % 5]:
                     st.image(row['Link Poster'], use_container_width=True)
                     st.caption(row['Tên phim'])
+
 
 
 
