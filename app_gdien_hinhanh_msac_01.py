@@ -102,32 +102,31 @@ movies_df, users_df, cosine_sim, ALL_GENRES = load_and_process_data()
 # ==============================================================================
 
 def get_ai_recommendations(history_titles, top_k=10, w_sim=0.7, w_pop=0.3, exclude=None):
-    # Tìm index của các phim trong lịch sử xem
+    # 1. Tìm index phim đã xem
     indices = []
     for title in history_titles:
         idx = movies_df[movies_df['Tên phim'] == title].index
         if not idx.empty:
             indices.append(idx[0])
     
-    # Nếu không có lịch sử, trả về top phổ biến (trừ những phim trong exclude)
+    # 2. Xử lý khi không có lịch sử hoặc loại trừ
+    if exclude is None: exclude = []
+    
     if not indices:
-        if exclude is None: exclude = []
+        # Lấy top phim phổ biến TRỪ những phim đã hiển thị (exclude)
         popular_movies = movies_df.drop(exclude, errors='ignore').sort_values(by='Độ phổ biến', ascending=False)
         recs = popular_movies.head(top_k)
         return recs, recs.index.tolist()
 
-    # Tính điểm tương đồng
+    # 3. Tính toán đề xuất AI
     sim_scores = np.mean(cosine_sim[indices], axis=0)
     pop_scores = movies_df['popularity_scaled'].values
     final_scores = (w_sim * sim_scores) + (w_pop * pop_scores)
     
-    # Sắp xếp
     scores_with_idx = list(enumerate(final_scores))
     scores_with_idx = sorted(scores_with_idx, key=lambda x: x[1], reverse=True)
     
-    # Lọc bỏ phim đã xem (history) VÀ phim đã hiển thị (exclude)
-    if exclude is None: exclude = []
-    
+    # 4. Lọc kết quả (Bỏ phim đã xem và phim đã hiển thị)
     final_indices = []
     for i, score in scores_with_idx:
         if i not in indices and i not in exclude:
@@ -136,6 +135,7 @@ def get_ai_recommendations(history_titles, top_k=10, w_sim=0.7, w_pop=0.3, exclu
                 break
     
     return movies_df.iloc[final_indices], final_indices
+    
 def search_movie_func(query):
     """
     Chức năng 2: Tìm kiếm phim và gợi ý tương tự
@@ -442,6 +442,7 @@ elif st.session_state.user_mode in ['guest', 'register']:
                 with cols[i % 5]:
                     st.image(row['Link Poster'], use_container_width=True)
                     st.caption(row['Tên phim'])
+
 
 
 
