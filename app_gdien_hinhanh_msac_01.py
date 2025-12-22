@@ -304,18 +304,19 @@ elif menu == "Đề xuất AI":
         st.write("Dựa trên sự kết hợp giữa **lịch sử xem** và **độ phổ biến** của phim.")
         
         st.subheader("Lịch sử xem gần nhất của bạn:")
-        st.write(", ".join(history))
+        # SỬA: Dùng đúng biến user_history
+        st.write(", ".join(user_history))
         
         st.markdown("---")
         st.subheader("Gợi ý dành riêng cho bạn:")
         
-        # Khởi tạo danh sách phim đã hiển thị để loại trừ khi bấm nút mới
         if 'ai_seen' not in st.session_state:
             st.session_state.ai_seen = []
 
         # Nút làm mới
         if st.button("🔄 Làm mới đề xuất"):
-            recs, idxs = get_ai_recommendations(history, exclude=st.session_state.ai_seen)
+            # SỬA: Dùng user_history thay vì history
+            recs, idxs = get_ai_recommendations(user_history, exclude=st.session_state.ai_seen)
             if idxs:
                 st.session_state.ai_seen.extend(idxs)
             
@@ -326,7 +327,7 @@ elif menu == "Đề xuất AI":
                     st.caption(f"**{row['Tên phim']}**")
         else:
             # Mặc định lần đầu
-            recs, idxs = get_ai_recommendations(history)
+            recs, idxs = get_ai_recommendations(user_history)
             if not st.session_state.ai_seen:
                 st.session_state.ai_seen.extend(idxs)
 
@@ -384,6 +385,7 @@ elif st.session_state.user_mode in ['guest', 'register']:
                 with cols[i % 5]:
                     st.image(row['Link Poster'], use_container_width=True)
                     st.caption(row['Tên phim'])
+
 
 
 
