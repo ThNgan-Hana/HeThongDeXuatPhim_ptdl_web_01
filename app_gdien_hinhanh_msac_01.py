@@ -299,7 +299,7 @@ if st.session_state.user_mode is None:
                 st.warning("Vui lòng chọn ít nhất 1 thể loại.")
 
 # 2. CHỨC NĂNG DÀNH CHO THÀNH VIÊN CŨ
-    elif menu == "Đề xuất AI":
+elif menu == "Đề xuất AI":
         st.header(f"🤖 Đề xuất Phim Thông minh cho {st.session_state.current_user['Tên người dùng']}")
         # ... (các dòng hiển thị text giữ nguyên) ...
         
@@ -345,7 +345,7 @@ if st.session_state.user_mode is None:
                 with st.expander("Chi tiết"):
                     st.write(f"⭐ {row['Độ phổ biến']:.1f}")
                     st.write(f"🎭 {row['Thể loại phim']}")
-    elif menu == "Đề xuất AI":
+elif menu == "Đề xuất AI":
         st.header(f"🤖 Đề xuất Phim Thông minh cho {st.session_state.current_user['Tên người dùng']}")
         st.write("Dựa trên sự kết hợp giữa **lịch sử xem** và **độ phổ biến** của phim.")
         
@@ -395,10 +395,10 @@ if st.session_state.user_mode is None:
                         st.write(f"🎭 {row['Thể loại phim']}")
     
     # --- Đảm bảo dòng elif tiếp theo nằm sát lề ngoài cùng (thẳng hàng với elif ở trên) ---
-    elif menu == "Tìm kiếm Phim":
+elif menu == "Tìm kiếm Phim":
         st.header("🔍 Tìm kiếm Phim")
         # ... (Code tìm kiếm phim giữ nguyên) ...
-    elif menu == "Theo Thể loại Yêu thích":
+elif menu == "Theo Thể loại Yêu thích":
         st.header("❤️ Đề xuất theo Thể loại Yêu thích")
         # Với user cũ, lấy từ cột Phim yêu thích nhất để suy ra thể loại, hoặc dùng lịch sử
         fav_movie = st.session_state.current_user['Phim yêu thích nhất']
@@ -421,7 +421,7 @@ if st.session_state.user_mode is None:
         else:
             st.error("Không tìm thấy thông tin phim yêu thích trong dữ liệu.")
 
-    elif menu == "Thống kê Cá nhân":
+elif menu == "Thống kê Cá nhân":
         st.header("📊 Thống kê Xu hướng Xem phim")
         draw_user_charts(user_history)
 
@@ -442,6 +442,7 @@ elif st.session_state.user_mode in ['guest', 'register']:
                 with cols[i % 5]:
                     st.image(row['Link Poster'], use_container_width=True)
                     st.caption(row['Tên phim'])
+
 
 
 
