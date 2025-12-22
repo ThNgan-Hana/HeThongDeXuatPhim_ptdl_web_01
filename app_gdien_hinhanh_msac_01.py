@@ -186,18 +186,37 @@ def draw_user_charts(history_titles):
     df_chart.columns = ['Thể loại', 'Số phim đã xem']
     df_chart = df_chart.sort_values(by='Số phim đã xem', ascending=False)
 
-    # Vẽ biểu đồ
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+    # --- PHẦN CHỈNH SỬA: TÁCH THÀNH 2 biểu đồ ---
     
-    # Biểu đồ 1: Pie Chart (Phân bố)
-    ax1.pie(df_chart['Số phim đã xem'], labels=df_chart['Thể loại'], autopct='%1.1f%%', startangle=90, colors=sns.color_palette('pastel'))
-    ax1.set_title('Phân bố thể loại đã xem')
+    # 1. BIỂU ĐỒ
+    tab1, tab2 = st.tabs(["Biểu đồ Tròn (Phân bố)", "Biểu đồ Cột (Số lượng)"])
 
-    # Biểu đồ 2: Bar Chart (Số lượng)
-    sns.barplot(x='Số phim đã xem', y='Thể loại', data=df_chart, ax=ax2, palette='viridis')
-    ax2.set_title('Số lượng phim theo thể loại')
-    
-    st.pyplot(fig)
+    # 2. Vẽ biểu đồ tròn
+    with tab1:
+        fig1, ax1 = plt.subplots(figsize=(10, 6))
+        ax1.pie(
+            df_chart['Số phim đã xem'], 
+            labels=df_chart['Thể loại'], 
+            autopct='%1.1f%%', 
+            startangle=90, 
+            colors=sns.color_palette('pastel')
+        )
+        ax1.set_title('Phân bố thể loại đã xem')
+        ax1.axis('equal')  # Đảm bảo biểu đồ tròn
+        st.pyplot(fig1)
+
+    # 3. Vẽ biểu đồ cột
+    with tab2:
+        fig2, ax2 = plt.subplots(figsize=(10, 6))
+        sns.barplot(
+            x='Số phim đã xem', 
+            y='Thể loại', 
+            data=df_chart, 
+            ax=ax2, 
+            palette='viridis'
+        )
+        ax2.set_title('Số lượng phim theo thể loại')
+        st.pyplot(fig2)
 
 # ==============================================================================
 # 4. GIAO DIỆN NGƯỜI DÙNG (UI)
@@ -390,5 +409,6 @@ elif st.session_state.user_mode in ['guest', 'register']:
                 with cols[i % 5]:
                     st.image(row['Link Poster'], use_container_width=True)
                     st.caption(row['Tên phim'])
+
 
 
