@@ -301,100 +301,42 @@ if st.session_state.user_mode is None:
 # 2. CHỨC NĂNG DÀNH CHO THÀNH VIÊN CŨ
 elif menu == "Đề xuất AI":
         st.header(f"🤖 Đề xuất Phim Thông minh cho {st.session_state.current_user['Tên người dùng']}")
-        # ... (các dòng hiển thị text giữ nguyên) ...
+        st.write("Dựa trên sự kết hợp giữa **lịch sử xem** và **độ phổ biến** của phim.")
         
-        # Khởi tạo session state để lưu các phim đã hiển thị (nếu chưa có)
+        st.subheader("Lịch sử xem gần nhất của bạn:")
+        st.write(", ".join(user_history))
+        
+        st.markdown("---")
+        st.subheader("Gợi ý dành riêng cho bạn:")
+        
+        # Khởi tạo danh sách phim đã hiển thị để loại trừ khi bấm nút mới
         if 'ai_seen' not in st.session_state:
             st.session_state.ai_seen = []
 
-        # Nút làm mới danh sách
+        # Nút làm mới
         if st.button("🔄 Làm mới đề xuất"):
-            # Gọi hàm với user_history (đúng tên biến) và danh sách loại trừ
-            recs, idxs = get_ai_recommendations(
-                user_history, 
-                exclude=st.session_state.ai_seen
-            )
-            
-            # Cập nhật danh sách đã xem vào session_state
+            recs, idxs = get_ai_recommendations(user_history, exclude=st.session_state.ai_seen)
             if idxs:
                 st.session_state.ai_seen.extend(idxs)
             
-            # Hiển thị phim (Copy đoạn hiển thị cũ vào đây)
             cols = st.columns(5)
             for i, (idx, row) in enumerate(recs.iterrows()):
                 with cols[i % 5]:
                     st.image(row['Link Poster'], use_container_width=True)
                     st.caption(f"**{row['Tên phim']}**")
         else:
-            # Mặc định lần đầu load
-            recs, idxs = get_ai_recommendations(user_history) # Không exclude lần đầu
-            st.session_state.ai_seen = idxs # Lưu lại để lần sau loại trừ
-            
-            cols = st.columns(5)
-            for i, (idx, row) in enumerate(recs.iterrows()):
-                with cols[i % 5]:
-                    st.image(row['Link Poster'], use_container_width=True)
-                    st.caption(f"**{row['Tên phim']}**")
-        
-        # Hiển thị kết quả dạng lưới
-        cols = st.columns(5)
-        for i, (idx, row) in enumerate(recs.iterrows()):
-            with cols[i % 5]:
-                st.image(row['Link Poster'], use_container_width=True)
-                st.caption(f"**{row['Tên phim']}**")
-                with st.expander("Chi tiết"):
-                    st.write(f"⭐ {row['Độ phổ biến']:.1f}")
-                    st.write(f"🎭 {row['Thể loại phim']}")
-elif menu == "Đề xuất AI":
-        st.header(f"🤖 Đề xuất Phim Thông minh cho {st.session_state.current_user['Tên người dùng']}")
-        st.write("Dựa trên sự kết hợp giữa **lịch sử xem** và **độ phổ biến** của phim.")
-        
-        st.subheader("Lịch sử xem gần nhất của bạn:")
-        st.write(", ".join(user_history)) # Dùng đúng biến user_history
-        
-        st.markdown("---")
-        st.subheader("Gợi ý dành riêng cho bạn:")
-
-        # --- PHẦN CODE MỚI (Đã chỉnh thụt đầu dòng chuẩn) ---
-        if 'ai_seen' not in st.session_state:
-            st.session_state.ai_seen = []
-
-        # Nút Làm mới
-        if st.button("🔄 Làm mới đề xuất"):
-            # Gọi hàm với user_history (đã sửa lỗi NameError)
-            recs, idxs = get_ai_recommendations(
-                user_history, 
-                exclude=st.session_state.ai_seen
-            )
-            if idxs:
+            # Mặc định lần đầu
+            recs, idxs = get_ai_recommendations(user_history)
+            if not st.session_state.ai_seen:
                 st.session_state.ai_seen.extend(idxs)
-            
-            # Hiển thị
-            cols = st.columns(5)
-            for i, (idx, row) in enumerate(recs.iterrows()):
-                with cols[i % 5]:
-                    st.image(row['Link Poster'], use_container_width=True)
-                    st.caption(f"**{row['Tên phim']}**")
-                    with st.expander("Chi tiết"):
-                        st.write(f"⭐ {row['Độ phổ biến']:.1f}")
-                        st.write(f"🎭 {row['Thể loại phim']}")
 
-        else: # Mặc định khi chưa bấm nút
-            recs, idxs = get_ai_recommendations(user_history) # Không exclude lần đầu
-            # Lưu lại những phim này để lần sau không hiện lại
-            if not st.session_state.ai_seen: 
-                 st.session_state.ai_seen.extend(idxs)
-            
             cols = st.columns(5)
             for i, (idx, row) in enumerate(recs.iterrows()):
                 with cols[i % 5]:
                     st.image(row['Link Poster'], use_container_width=True)
                     st.caption(f"**{row['Tên phim']}**")
-                    with st.expander("Chi tiết"):
-                        st.write(f"⭐ {row['Độ phổ biến']:.1f}")
-                        st.write(f"🎭 {row['Thể loại phim']}")
-    
-    # --- Đảm bảo dòng elif tiếp theo nằm sát lề ngoài cùng (thẳng hàng với elif ở trên) ---
+                    
+  
 elif menu == "Tìm kiếm Phim":
         st.header("🔍 Tìm kiếm Phim")
         # ... (Code tìm kiếm phim giữ nguyên) ...
@@ -442,6 +384,7 @@ elif st.session_state.user_mode in ['guest', 'register']:
                 with cols[i % 5]:
                     st.image(row['Link Poster'], use_container_width=True)
                     st.caption(row['Tên phim'])
+
 
 
 
