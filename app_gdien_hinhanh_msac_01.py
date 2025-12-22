@@ -26,109 +26,144 @@ from collections import Counter
 # ==============================================================================
 # 1. CẤU HÌNH TRANG & CSS (GIAO DIỆN NÂNG CAO)
 # ==============================================================================
+import streamlit as st
+import pandas as pd
+import numpy as np
+import ast
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.preprocessing import MinMaxScaler
+from collections import Counter
+
+# ==============================================================================
+# 1. CẤU HÌNH TRANG & CSS (GIAO DIỆN NETFLIX STYLE)
+# ==============================================================================
 st.set_page_config(
-    page_title="DreamStream - Movie AI",
+    page_title="DreamStream",
     page_icon="🎬",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS cho giao diện đẹp, hiện đại (Netflix Style)
+# Custom CSS: Dark Theme & Netflix Style
 st.markdown("""
 <style>
-    /* Import Font hiện đại */
-    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
 
+    /* 1. Cấu hình chung cho toàn trang */
     html, body, [class*="css"] {
-        font-family: 'Poppins', sans-serif;
+        font-family: 'Roboto', sans-serif;
+        background-color: #141414; /* Màu nền đen Netflix */
+        color: #ffffff; /* Chữ trắng */
     }
 
-    /* 1. Tiêu đề Gradient */
+    /* 2. Nền chính của App */
+    .stApp {
+        background-color: #141414;
+    }
+
+    /* 3. Sidebar (Thanh bên) */
+    section[data-testid="stSidebar"] {
+        background-color: #000000; /* Sidebar đen tuyền */
+        border-right: 1px solid #333;
+    }
+    
+    /* 4. Tiêu đề (Header) */
+    h1, h2, h3 {
+        color: #ffffff !important;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+    }
     h1 {
-        background: linear-gradient(to right, #ff4b4b, #ff9068);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        font-weight: 800 !important;
-        margin-bottom: 0px;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
     }
 
-    /* 2. Nút bấm (Button) - Hiệu ứng Glow */
+    /* 5. Nút bấm (Button) - Màu đỏ đặc trưng */
     .stButton>button {
-        width: 100%;
-        border-radius: 12px;
-        height: 3em;
-        background: linear-gradient(90deg, #ff4b4b 0%, #ff416c 100%);
+        background-color: #E50914; /* Đỏ Netflix */
         color: white;
         border: none;
-        font-weight: 600;
-        box-shadow: 0 4px 15px rgba(255, 75, 75, 0.3);
+        border-radius: 4px; /* Bo góc nhẹ */
+        height: 3em;
+        font-weight: bold;
         transition: all 0.3s ease;
+        text-transform: uppercase;
+        letter-spacing: 1px;
     }
     .stButton>button:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 8px 25px rgba(255, 75, 75, 0.5);
-        background: linear-gradient(90deg, #ff416c 0%, #ff4b4b 100%);
+        background-color: #f40612;
+        transform: scale(1.02);
+        box-shadow: 0 4px 12px rgba(229, 9, 20, 0.4);
+    }
+    .stButton>button:active {
+        background-color: #b00710;
+        color: #ccc;
     }
 
-    /* 3. Poster Phim - Hiệu ứng Zoom & Shadow */
+    /* 6. Poster Phim (Image) - Hiệu ứng Hover Zoom */
     div[data-testid="stImage"] img {
-        border-radius: 12px;
+        border-radius: 6px;
         transition: transform 0.3s ease, box-shadow 0.3s ease;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
     }
     div[data-testid="stImage"] img:hover {
-        transform: scale(1.05);
-        box-shadow: 0 12px 24px rgba(0,0,0,0.6);
+        transform: scale(1.1); /* Phóng to khi rê chuột */
         z-index: 10;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.8);
         cursor: pointer;
     }
 
-    /* 4. Expander (Nút xem chi tiết) */
+    /* 7. Input Fields & Selectbox (Chuyển sang màu tối) */
+    .stTextInput>div>div>input {
+        background-color: #333333;
+        color: white;
+        border: 1px solid #555;
+    }
+    .stSelectbox>div>div>div {
+        background-color: #333333;
+        color: white;
+    }
+    
+    /* 8. Expander (Nút chi tiết) */
     .streamlit-expanderHeader {
-        background-color: #1f1f1f; /* Màu nền tối hơn */
-        border-radius: 8px;
-        font-size: 0.9em;
-        color: #e0e0e0;
+        background-color: #262626;
+        color: #e5e5e5;
+        border-radius: 4px;
+        font-weight: 500;
     }
-    
-    /* 5. Sidebar */
-    section[data-testid="stSidebar"] {
-        background-color: #161616; /* Sidebar tối màu */
+    div[data-testid="stExpanderDetails"] {
+        background-color: #181818;
+        border: 1px solid #333;
+        border-radius: 0 0 4px 4px;
     }
-    
-    /* 6. Tabs */
+
+    /* 9. Tabs */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 10px;
+        gap: 20px;
     }
     .stTabs [data-baseweb="tab"] {
-        height: 50px;
-        border-radius: 8px 8px 0 0;
-        background-color: #262730;
-        padding: 0 20px;
-        border: none;
+        background-color: transparent;
+        color: #888;
+        font-weight: bold;
+        padding-bottom: 10px;
     }
     .stTabs [aria-selected="true"] {
-        background-color: #ff4b4b !important;
-        color: white !important;
+        color: #E50914 !important; /* Tab đang chọn màu đỏ */
+        border-bottom: 3px solid #E50914;
+    }
+    
+    /* 10. Radio Button (Sidebar Menu) */
+    .stRadio [role="radiogroup"] {
+        color: white;
     }
 
-    /* Tùy chỉnh thanh cuộn cho gọn */
+    /* Tùy chỉnh thanh cuộn (Scrollbar) */
     ::-webkit-scrollbar {
-        width: 8px;
+        width: 10px;
     }
     ::-webkit-scrollbar-track {
-        background: #0e1117; 
-    }
-    ::-webkit-scrollbar-thumb {
-        background: #555; 
-        border-radius: 4px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-        background: #888; 
-    }
-</style>
-""", unsafe_allow_html=True)
-
+        background:
 # ==============================================================================
 # 2. HÀM TIỀN XỬ LÝ DỮ LIỆU (QUAN TRỌNG)
 # ==============================================================================
@@ -624,6 +659,7 @@ elif st.session_state.user_mode in ['guest', 'register']:
                         st.write(f"🏷️ **Thể loại:** {row['Thể loại phim']}")
                         st.write(f"⭐ **Điểm:** {round(row['Độ phổ biến'], 1)}")
                         st.caption(f"📝 {row['Mô tả'][:100]}...")
+
 
 
 
