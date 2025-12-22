@@ -246,7 +246,7 @@ with st.sidebar:
     elif st.session_state.user_mode in ['guest', 'register']:
         st.info(f"Chế độ: {st.session_state.user_mode.upper()}")
         menu = st.radio("Chức năng", ["Đề xuất AI (Cơ bản)", "Theo Thể loại Đã chọn"])
-        if st.button("Thoát chế độ Khách"):
+        if st.button("Thoát"):
             st.session_state.user_mode = None
             st.session_state.user_genres = []
             st.rerun()
@@ -409,6 +409,7 @@ elif st.session_state.user_mode in ['guest', 'register']:
                 with cols[i % 5]:
                     st.image(row['Link Poster'], use_container_width=True)
                     st.caption(row['Tên phim'])
+
 
 
 
