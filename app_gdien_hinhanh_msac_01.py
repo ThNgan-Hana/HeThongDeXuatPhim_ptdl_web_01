@@ -406,33 +406,32 @@ elif st.session_state.user_mode == 'member':
         st.header("📊 Thống kê Xu hướng Xem phim")
         draw_user_charts(user_history)
 
+
 # 3. CHỨC NĂNG DÀNH CHO KHÁCH / NGƯỜI ĐĂNG KÝ
 elif st.session_state.user_mode in ['guest', 'register']:
     
     selected_g = st.session_state.user_genres
-   
-                
+    
     if menu == "Theo Thể loại Đã chọn":
         st.header("📂 Duyệt phim theo Thể loại")
         # Cho phép lọc kỹ hơn trong các thể loại đã chọn
         sub_genre = st.selectbox("Chọn cụ thể:", selected_g)
+        
         if sub_genre:
             recs = get_genre_recommendations([sub_genre], top_k=10)
-            cols = st.columns(5)
-            for i, (idx, row) in enumerate(recs.iterrows()):
-                with cols[i % 5]:
-                    st.image(row['Link Poster'], use_container_width=True)
-                    st.caption(row['Tên phim'])
-
-        if sub_genre:
-            recs = get_genre_recommendations([sub_genre], top_k=10)
-            cols = st.columns(5)
-            for i, (idx, row) in enumerate(recs.iterrows()):
-                with cols[i % 5]:
-                    st.image(row['Link Poster'], use_container_width=True)
-                    st.write(f"**{row['Tên phim']}**")
-                    # Thêm expander giống như trên
-                    with st.expander("Chi tiết"):
-                        st.write(f"🎬 {row['Đạo diễn']}")
-                        st.write(f"⭐ {round(row['Độ phổ biến'], 1)}")
-                        st.caption(row['Mô tả'][:100] + "...")
+            
+            if not recs.empty:
+                cols = st.columns(5)
+                for i, (idx, row) in enumerate(recs.iterrows()):
+                    with cols[i % 5]:
+                        st.image(row['Link Poster'], use_container_width=True)
+                        st.write(f"**{row['Tên phim']}**")
+                        
+                        # --- Thêm nút xem chi tiết ---
+                        with st.expander("ℹ️ Chi tiết"):
+                            st.write(f"🎬 **Đạo diễn:** {row['Đạo diễn']}")
+                            st.write(f"🏷️ **Thể loại:** {row['Thể loại phim']}")
+                            st.write(f"⭐ **Điểm:** {round(row['Độ phổ biến'], 1)}")
+                            st.caption(f"📝 {row['Mô tả'][:100]}...")
+            else:
+                st.warning("Chưa có dữ liệu cho thể loại này.")
