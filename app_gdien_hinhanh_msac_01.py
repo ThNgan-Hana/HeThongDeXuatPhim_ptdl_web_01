@@ -299,13 +299,17 @@ if st.session_state.user_mode is None:
                 st.warning("Vui lòng chọn ít nhất 1 thể loại.")
 
 # 2. CHỨC NĂNG DÀNH CHO THÀNH VIÊN CŨ
+elif st.session_state.user_mode == 'member':
+    user_history = st.session_state.current_user['history_list']
+
+st.write(", ".join(user_history))
 elif menu == "Đề xuất AI":
         st.header(f"🤖 Đề xuất Phim Thông minh cho {st.session_state.current_user['Tên người dùng']}")
         st.write("Dựa trên sự kết hợp giữa **lịch sử xem** và **độ phổ biến** của phim.")
         
         st.subheader("Lịch sử xem gần nhất của bạn:")
         # SỬA: Dùng đúng biến user_history
-        st.write(", ".join(user_history))
+        st.write(",".join(user_history))
         
         st.markdown("---")
         st.subheader("Gợi ý dành riêng cho bạn:")
@@ -385,6 +389,7 @@ elif st.session_state.user_mode in ['guest', 'register']:
                 with cols[i % 5]:
                     st.image(row['Link Poster'], use_container_width=True)
                     st.caption(row['Tên phim'])
+
 
 
 
