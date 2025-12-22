@@ -300,6 +300,11 @@ elif st.session_state.user_mode == 'member':
     user_history = st.session_state.current_user['history_list']
     
     if menu == "Đề xuất AI":
+        if st.button("🔄 Tạo mới"):
+            st.session_state.ai_seen.clear()
+
+        recs, idxs = get_ai_recommendations(history, exclude=st.session_state.ai_seen)
+        st.session_state.ai_seen.update(idxs)
         st.header(f"🤖 Đề xuất Phim Thông minh cho {st.session_state.current_user['Tên người dùng']}")
         st.write("Dựa trên sự kết hợp giữa **lịch sử xem** và **độ phổ biến** của phim.")
         
@@ -396,6 +401,7 @@ elif st.session_state.user_mode in ['guest', 'register']:
                 with cols[i % 5]:
                     st.image(row['Link Poster'], use_container_width=True)
                     st.caption(row['Tên phim'])
+
 
 
 
