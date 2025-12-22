@@ -345,7 +345,7 @@ elif menu == "Đề xuất AI":
                 with st.expander("Chi tiết"):
                     st.write(f"⭐ {row['Độ phổ biến']:.1f}")
                     st.write(f"🎭 {row['Thể loại phim']}")
-elif menu == "Đề xuất AI":
+    elif menu == "Đề xuất AI":
         st.header(f"🤖 Đề xuất Phim Thông minh cho {st.session_state.current_user['Tên người dùng']}")
         st.write("Dựa trên sự kết hợp giữa **lịch sử xem** và **độ phổ biến** của phim.")
         
@@ -442,6 +442,7 @@ elif st.session_state.user_mode in ['guest', 'register']:
                 with cols[i % 5]:
                     st.image(row['Link Poster'], use_container_width=True)
                     st.caption(row['Tên phim'])
+
 
 
 
