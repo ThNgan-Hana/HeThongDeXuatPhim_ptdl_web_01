@@ -370,19 +370,46 @@ elif st.session_state.user_mode == 'member':
             results = search_movie_func(search_query)
             if not results.empty:
                 st.success(f"Tìm thấy {len(results)} kết quả:")
+                
+                # Hiển thị kết quả tìm kiếm
                 cols = st.columns(5)
                 for i, (idx, row) in enumerate(results.iterrows()):
                     with cols[i % 5]:
                         st.image(row['Link Poster'], use_container_width=True)
                         st.write(f"**{row['Tên phim']}**")
-                        # --- PHẦN THÊM CHI TIẾT ---
-                        with st.expander("ℹ️ Xem chi tiết"):
-                            st.write(f"🎬 **Đạo diễn:** {row['Đạo diễn']}")
-                            st.write(f"🏷️ **Thể loại:** {row['Thể loại phim']}")
-                            st.write(f"⭐ **Điểm:** {round(row['Độ phổ biến'], 1)}")
-                            st.caption(f"📝 {row['Mô tả']}")
+                        with st.expander("ℹ️ Chi tiết"):
+                            st.write(f"🎬 {row['Đạo diễn']}")
+                            st.write(f"🏷️ {row['Thể loại phim']}")
+                            st.caption(row['Mô tả'][:100])
+
+                # --- PHẦN MỚI: GỢI Ý TƯƠNG TỰ ---
+                st.markdown("---")
+                st.subheader("💡 Có thể bạn cũng thích (Tương tự kết quả đầu tiên):")
+                
+                # Lấy phim đầu tiên trong kết quả tìm kiếm để làm gốc
+                first_movie = results.iloc[0]
+                first_movie_genres = [g.strip() for g in first_movie['Thể loại phim'].split(',')]
+                
+                # Tìm phim tương tự (loại trừ chính những phim vừa tìm thấy)
+                similar_recs = get_genre_recommendations(
+                    first_movie_genres, 
+                    top_k=5, 
+                    exclude=results.index.tolist() # Không hiện lại phim vừa tìm
+                )
+                
+                if not similar_recs.empty:
+                    cols_sim = st.columns(5)
+                    for i, (idx, row) in enumerate(similar_recs.iterrows()):
+                        with cols_sim[i % 5]:
+                            st.image(row['Link Poster'], use_container_width=True)
+                            st.write(f"**{row['Tên phim']}**")
+                            with st.expander("Xem thêm"):
+                                st.caption(f"Thể loại: {row['Thể loại phim']}")
+                else:
+                    st.info("Không tìm thấy phim tương tự khác.")
             else:
                 st.warning("Không tìm thấy phim nào khớp với từ khóa.")
+    
 
     # --- 3. MENU THEO THỂ LOẠI YÊU THÍCH ---
     elif menu == "Theo Thể loại Yêu thích":
@@ -393,28 +420,49 @@ elif st.session_state.user_mode == 'member':
         if fav_movie:
             st.write(f"Phim tâm đắc nhất của bạn: **{fav_movie}**")
             
+            # Lấy thông tin phim yêu thích
             row = movies_df[movies_df['Tên phim'] == fav_movie]
             if not row.empty:
                 genres_str = row.iloc[0]['Thể loại phim']
                 fav_genres = [x.strip() for x in genres_str.split(',')]
+                st.info(f"Thể loại ưa thích xác định được: **{', '.join(fav_genres)}**")
                 
-                st.info(f"Thể loại ưa thích: **{', '.join(fav_genres)}**")
+                # --- LOGIC STATE CHO MEMBER (Giống Guest) ---
+                if 'member_fav_seen' not in st.session_state:
+                    st.session_state.member_fav_seen = [] # Danh sách ID đã xem
+                if 'member_fav_recs' not in st.session_state:
+                    st.session_state.member_fav_recs = None # DataFrame đang hiện
+
+                # Nút làm mới
+                col_btn, _ = st.columns([1, 4])
+                is_refresh = col_btn.button("🔄 Làm mới danh sách")
                 
-                recs = get_genre_recommendations(fav_genres)
-                if not recs.empty:
+                # Logic tải dữ liệu: Chạy khi (Bấm nút) HOẶC (Chưa có dữ liệu)
+                if is_refresh or st.session_state.member_fav_recs is None:
+                    new_recs = get_genre_recommendations(
+                        fav_genres, 
+                        top_k=10, 
+                        exclude=st.session_state.member_fav_seen
+                    )
+                    
+                    if not new_recs.empty:
+                        st.session_state.member_fav_recs = new_recs
+                        st.session_state.member_fav_seen.extend(new_recs.index.tolist())
+                        if is_refresh: st.success("Đã cập nhật phim mới!")
+                    else:
+                        st.warning("Đã hiển thị hết các phim nổi bật trong thể loại này.")
+                
+                # Hiển thị từ State
+                if st.session_state.member_fav_recs is not None and not st.session_state.member_fav_recs.empty:
                     cols = st.columns(5)
-                    for i, (idx, r) in enumerate(recs.iterrows()):
+                    for i, (idx, r) in enumerate(st.session_state.member_fav_recs.iterrows()):
                         with cols[i % 5]:
                             st.image(r['Link Poster'], use_container_width=True)
                             st.write(f"**{r['Tên phim']}**")
-                            # --- PHẦN THÊM CHI TIẾT ---
-                            with st.expander("ℹ️ Xem chi tiết"):
-                                st.write(f"🎬 **Đạo diễn:** {r['Đạo diễn']}")
-                                st.write(f"🏷️ **Thể loại:** {r['Thể loại phim']}")
-                                st.write(f"⭐ **Điểm:** {round(r['Độ phổ biến'], 1)}")
-                                st.caption(f"📝 {r['Mô tả'][:150]}...")
-                else:
-                    st.warning("Không tìm thấy đề xuất phù hợp.")
+                            with st.expander("ℹ️ Chi tiết"):
+                                st.write(f"🎬 {r['Đạo diễn']}")
+                                st.write(f"⭐ {round(r['Độ phổ biến'], 1)}")
+                                st.caption(r['Mô tả'][:100])
             else:
                 st.error("Không tìm thấy thông tin phim yêu thích trong dữ liệu gốc.")
         else:
@@ -426,7 +474,6 @@ elif st.session_state.user_mode == 'member':
         draw_user_charts(user_history)
 
 
-# 3. CHỨC NĂNG DÀNH CHO KHÁCH / NGƯỜI ĐĂNG KÝ
 # 3. CHỨC NĂNG DÀNH CHO KHÁCH / NGƯỜI ĐĂNG KÝ
 elif st.session_state.user_mode in ['guest', 'register']:
     
@@ -495,6 +542,7 @@ elif st.session_state.user_mode in ['guest', 'register']:
                         st.write(f"🏷️ **Thể loại:** {row['Thể loại phim']}")
                         st.write(f"⭐ **Điểm:** {round(row['Độ phổ biến'], 1)}")
                         st.caption(f"📝 {row['Mô tả'][:100]}...")
+
 
 
 
