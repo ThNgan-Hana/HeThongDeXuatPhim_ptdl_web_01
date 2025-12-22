@@ -299,7 +299,7 @@ if st.session_state.user_mode is None:
                 st.warning("Vui lòng chọn ít nhất 1 thể loại.")
 
 # 2. CHỨC NĂNG DÀNH CHO THÀNH VIÊN CŨ
-elif menu == "Đề xuất AI":
+    elif menu == "Đề xuất AI":
         st.header(f"🤖 Đề xuất Phim Thông minh cho {st.session_state.current_user['Tên người dùng']}")
         # ... (các dòng hiển thị text giữ nguyên) ...
         
@@ -442,6 +442,7 @@ elif st.session_state.user_mode in ['guest', 'register']:
                 with cols[i % 5]:
                     st.image(row['Link Poster'], use_container_width=True)
                     st.caption(row['Tên phim'])
+
 
 
 
