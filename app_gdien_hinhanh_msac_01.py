@@ -103,6 +103,61 @@ movies_df, users_df, cosine_sim, ALL_GENRES = load_and_process_data()
 
 def get_ai_recommendations(history_titles, top_k=10, w_sim=0.7, w_pop=0.3, exclude=None):
     """
+    Chức năng 1: Đề xuất dựa trên lịch sử xem (Content-based Filtering)
+    """
+    # 1. Tìm index phim đã xem trong dữ liệu
+    indices = []
+    for title in history_titles:
+        idx = movies_df[movies_df['Tên phim'] == title].index
+        if not idx.empty:
+            indices.append(idx[0])
+    
+    # 2. Xử lý danh sách loại trừ (nếu có)
+    if exclude is None: exclude = []
+    
+    # Nếu chưa xem phim nào -> Gợi ý theo độ phổ biến (trừ những phim đã hiện)
+    if not indices:
+        popular_movies = movies_df.drop(exclude, errors='ignore').sort_values(by='Độ phổ biến', ascending=False)
+        recs = popular_movies.head(top_k)
+        return recs, recs.index.tolist()
+
+    # 3. Tính toán điểm số đề xuất (AI)
+    # Lấy trung bình độ tương đồng của các phim đã xem với tất cả phim còn lại
+    sim_scores = np.mean(cosine_sim[indices], axis=0)
+    
+    # Lấy điểm độ phổ biến
+    pop_scores = movies_df['popularity_scaled'].values
+    
+    # Tính điểm tổng hợp: (Trọng số Sim * Điểm Sim) + (Trọng số Pop * Điểm Pop)
+    final_scores = (w_sim * sim_scores) + (w_pop * pop_scores)
+    
+    # Tạo danh sách (index, score) và sắp xếp giảm dần
+    scores_with_idx = list(enumerate(final_scores))
+    scores_with_idx = sorted(scores_with_idx, key=lambda x: x[1], reverse=True)
+    
+    # 4. Lọc kết quả (Bỏ phim đã xem và phim nằm trong danh sách loại trừ)
+    final_indices = []
+    for i, score in scores_with_idx:
+        # i không nằm trong danh sách đã xem (indices) VÀ không nằm trong danh sách loại trừ (exclude)
+        if i not in indices and i not in exclude:
+            final_indices.append(i)
+            if len(final_indices) >= top_k:
+                break
+    
+    return movies_df.iloc[final_indices], final_indices
+   
+    
+def search_movie_func(query):
+    """
+    Chức năng 2: Tìm kiếm phim và gợi ý tương tự
+    """
+    # Tìm kiếm gần đúng (chứa chuỗi)
+    result = movies_df[movies_df['Tên phim'].str.contains(query, case=False, na=False)]
+    return result
+
+
+def get_genre_recommendations(selected_genres, top_k=10, exclude=None):
+    """
     Chức năng 3: Đề xuất dựa trên thể loại (Có loại trừ phim đã xem)
     """
     if not selected_genres:
@@ -124,33 +179,6 @@ def get_ai_recommendations(history_titles, top_k=10, w_sim=0.7, w_pop=0.3, exclu
         return pd.DataFrame()
 
     # 4. Trả về top phim phổ biến nhất còn lại
-    return filtered.sort_values(by='Độ phổ biến', ascending=False).head(top_k)
-   
-    
-def search_movie_func(query):
-    """
-    Chức năng 2: Tìm kiếm phim và gợi ý tương tự
-    """
-    # Tìm kiếm gần đúng (chứa chuỗi)
-    result = movies_df[movies_df['Tên phim'].str.contains(query, case=False, na=False)]
-    return result
-
-def get_genre_recommendations(selected_genres, top_k=10):
-    """
-    Chức năng 3: Đề xuất dựa trên thể loại
-    """
-    if not selected_genres:
-        return pd.DataFrame()
-    
-    # Lọc các phim có chứa ÍT NHẤT 1 trong các thể loại đã chọn
-    # Tạo regex pattern ví dụ: "Hành động|Hài"
-    pattern = '|'.join(selected_genres)
-    filtered = movies_df[movies_df['Thể loại phim'].str.contains(pattern, case=False, na=False)]
-    
-    if filtered.empty:
-        return pd.DataFrame()
-    
-    # Sắp xếp theo độ phổ biến để gợi ý phim hay nhất trong thể loại đó
     return filtered.sort_values(by='Độ phổ biến', ascending=False).head(top_k)
 
 def draw_user_charts(history_titles):
@@ -467,5 +495,6 @@ elif st.session_state.user_mode in ['guest', 'register']:
                         st.write(f"🏷️ **Thể loại:** {row['Thể loại phim']}")
                         st.write(f"⭐ **Điểm:** {round(row['Độ phổ biến'], 1)}")
                         st.caption(f"📝 {row['Mô tả'][:100]}...")
+
 
 
