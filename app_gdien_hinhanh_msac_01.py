@@ -389,13 +389,14 @@ elif st.session_state.user_mode in ['guest', 'register']:
         st.header("📂 Duyệt phim theo Thể loại")
         # Cho phép lọc kỹ hơn trong các thể loại đã chọn
         sub_genre = st.selectbox("Chọn cụ thể:", selected_g)
-            if sub_genre:
+        if sub_genre:
             recs = get_genre_recommendations([sub_genre], top_k=10)
             cols = st.columns(5)
             for i, (idx, row) in enumerate(recs.iterrows()):
                 with cols[i % 5]:
                     st.image(row['Link Poster'], use_container_width=True)
                     st.caption(row['Tên phim'])
+
 
 
 
