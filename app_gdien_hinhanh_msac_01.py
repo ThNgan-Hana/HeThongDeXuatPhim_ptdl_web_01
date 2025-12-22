@@ -102,39 +102,30 @@ movies_df, users_df, cosine_sim, ALL_GENRES = load_and_process_data()
 # ==============================================================================
 
 def get_ai_recommendations(history_titles, top_k=10, w_sim=0.7, w_pop=0.3, exclude=None):
-    # 1. Tìm index phim đã xem
-    indices = []
-    for title in history_titles:
-        idx = movies_df[movies_df['Tên phim'] == title].index
-        if not idx.empty:
-            indices.append(idx[0])
+    """
+    Chức năng 3: Đề xuất dựa trên thể loại (Có loại trừ phim đã xem)
+    """
+    if not selected_genres:
+        return pd.DataFrame()
     
-    # 2. Xử lý khi không có lịch sử hoặc loại trừ
-    if exclude is None: exclude = []
-    
-    if not indices:
-        # Lấy top phim phổ biến TRỪ những phim đã hiển thị (exclude)
-        popular_movies = movies_df.drop(exclude, errors='ignore').sort_values(by='Độ phổ biến', ascending=False)
-        recs = popular_movies.head(top_k)
-        return recs, recs.index.tolist()
+    # 1. Xử lý danh sách loại trừ (nếu có)
+    if exclude is None:
+        exclude = []
 
-    # 3. Tính toán đề xuất AI
-    sim_scores = np.mean(cosine_sim[indices], axis=0)
-    pop_scores = movies_df['popularity_scaled'].values
-    final_scores = (w_sim * sim_scores) + (w_pop * pop_scores)
+    # 2. Lọc các phim theo thể loại
+    pattern = '|'.join(selected_genres)
+    filtered = movies_df[movies_df['Thể loại phim'].str.contains(pattern, case=False, na=False)]
     
-    scores_with_idx = list(enumerate(final_scores))
-    scores_with_idx = sorted(scores_with_idx, key=lambda x: x[1], reverse=True)
-    
-    # 4. Lọc kết quả (Bỏ phim đã xem và phim đã hiển thị)
-    final_indices = []
-    for i, score in scores_with_idx:
-        if i not in indices and i not in exclude:
-            final_indices.append(i)
-            if len(final_indices) >= top_k:
-                break
-    
-    return movies_df.iloc[final_indices], final_indices
+    # 3. Loại bỏ các phim nằm trong danh sách exclude
+    if exclude:
+        filtered = filtered.drop(exclude, errors='ignore')
+
+    if filtered.empty:
+        return pd.DataFrame()
+
+    # 4. Trả về top phim phổ biến nhất còn lại
+    return filtered.sort_values(by='Độ phổ biến', ascending=False).head(top_k)
+   
     
 def search_movie_func(query):
     """
@@ -476,4 +467,5 @@ elif st.session_state.user_mode in ['guest', 'register']:
                         st.write(f"🏷️ **Thể loại:** {row['Thể loại phim']}")
                         st.write(f"⭐ **Điểm:** {round(row['Độ phổ biến'], 1)}")
                         st.caption(f"📝 {row['Mô tả'][:100]}...")
+
 
