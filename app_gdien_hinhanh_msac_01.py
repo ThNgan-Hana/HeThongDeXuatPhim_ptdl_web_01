@@ -9,9 +9,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import MinMaxScaler
 from collections import Counter
 
-# ==============================================================================
-# 1. CẤU HÌNH TRANG & CSS
-# ==============================================================================
+
 st.set_page_config(
     page_title="Movie RecSys AI",
     page_icon="🎬",
@@ -19,7 +17,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS cho giao diện đẹp hơn
+
 st.markdown("""
 <style>
     .stButton>button {
@@ -47,9 +45,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ==============================================================================
-# 2. HÀM TIỀN XỬ LÝ DỮ LIỆU (QUAN TRỌNG)
-# ==============================================================================
+
 @st.cache_resource
 def load_and_process_data():
     # Load data
@@ -97,9 +93,7 @@ def load_and_process_data():
 # Gọi hàm load dữ liệu
 movies_df, users_df, cosine_sim, ALL_GENRES = load_and_process_data()
 
-# ==============================================================================
-# 3. CÁC HÀM CHỨC NĂNG CỐT LÕI (ALGORITHMS)
-# ==============================================================================
+
 
 def get_ai_recommendations(history_titles, top_k=10, w_sim=0.7, w_pop=0.3, exclude=None):
     """
@@ -208,7 +202,7 @@ def draw_user_charts(history_titles):
     df_chart.columns = ['Thể loại', 'Số phim đã xem']
     df_chart = df_chart.sort_values(by='Số phim đã xem', ascending=False)
 
-    # --- PHẦN CHỈNH SỬA: TÁCH THÀNH 2 biểu đồ ---
+  
     
     # 1. BIỂU ĐỒ
     tab1, tab2 = st.tabs(["Biểu đồ Tròn (Phân bố)", "Biểu đồ Cột (Số lượng)"])
@@ -240,11 +234,9 @@ def draw_user_charts(history_titles):
         ax2.set_title('Số lượng phim theo thể loại')
         st.pyplot(fig2)
 
-# ==============================================================================
-# 4. GIAO DIỆN NGƯỜI DÙNG (UI)
-# ==============================================================================
 
-# --- Session State Management ---
+
+
 if 'user_mode' not in st.session_state:
     st.session_state.user_mode = None  # 'member', 'guest', 'register'
 if 'current_user' not in st.session_state:
@@ -252,7 +244,7 @@ if 'current_user' not in st.session_state:
 if 'user_genres' not in st.session_state: # Cho Guest/Register
     st.session_state.user_genres = []
 
-# --- Sidebar ---
+
 with st.sidebar:
     st.title("🎬 DreamStream")
     st.write("Hệ thống gợi ý phim thông minh")
@@ -277,7 +269,7 @@ with st.sidebar:
         st.warning("Vui lòng đăng nhập hoặc chọn chế độ khách.")
         menu = "Login"
 
-# --- Main Content ---
+
 
 # 1. MÀN HÌNH LOGIN / REGISTER
 if st.session_state.user_mode is None:
@@ -317,7 +309,7 @@ if st.session_state.user_mode is None:
             else:
                 st.warning("Vui lòng chọn ít nhất 1 thể loại.")
 
-# 2. CHỨC NĂNG DÀNH CHO THÀNH VIÊN CŨ
+
 # 2. CHỨC NĂNG DÀNH CHO THÀNH VIÊN CŨ
 elif st.session_state.user_mode == 'member':
     # Lấy lịch sử xem
@@ -382,7 +374,7 @@ elif st.session_state.user_mode == 'member':
                             st.write(f"🏷️ {row['Thể loại phim']}")
                             st.caption(row['Mô tả'][:100])
 
-                # --- PHẦN MỚI: GỢI Ý TƯƠNG TỰ ---
+                # GỢI Ý TƯƠNG TỰ 
                 st.markdown("---")
                 st.subheader("💡 Có thể bạn cũng thích (Tương tự kết quả đầu tiên):")
                 
@@ -499,9 +491,9 @@ elif st.session_state.user_mode in ['guest', 'register']:
             st.session_state.guest_current_genre = sub_genre
             st.session_state.guest_seen_ids = []  # Xóa lịch sử đã xem cũ
             st.session_state.guest_recs_df = None # Xóa phim đang hiện cũ
-            # (Streamlit sẽ chạy tiếp xuống dưới để tải dữ liệu mới)
+          
 
-        # 3. Xử lý nút "Làm mới" HOẶC Tải lần đầu
+        # 3. Nút "Làm mới"
         col_btn, col_empty = st.columns([1, 4])
         is_click_refresh = col_btn.button("🔄 Làm mới đề xuất")
         
@@ -542,5 +534,6 @@ elif st.session_state.user_mode in ['guest', 'register']:
                         st.write(f"🏷️ **Thể loại:** {row['Thể loại phim']}")
                         st.write(f"⭐ **Điểm:** {round(row['Độ phổ biến'], 1)}")
                         st.caption(f"📝 {row['Mô tả'][:100]}...")
+
 
 
